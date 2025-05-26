@@ -31,7 +31,7 @@ This repository contains scripts and configuration files to set up an Open vSwit
 
 ## Installation Instructions
 
-### 1. Install OVS
+### 1. Install Open vSwitch
 
 ```bash
 sudo apt update
@@ -55,29 +55,31 @@ sudo systemctl enable setup-ovs.service
 
 ### 4. Configure Netplan
 
-Make sure your Netplan YAML includes a dummy bridge `br0` definition (as shown below):
+Edit `/etc/netplan/01-netcfg.yaml` to include a defined `br0` bridge:
 
 ```yaml
 network:
   version: 2
   renderer: networkd
-
   ethernets:
     ens3:
       dhcp4: false
-      addresses: [10.0.22.3/24]
+      optional: true
+      addresses:
+        - 10.0.22.3/24
 
   bridges:
     br0:
       interfaces: []
+      dhcp4: no
       optional: true
-      dhcp4: false
 
   vlans:
     br0.2201:
       id: 2201
       link: br0
-      addresses: [10.10.3.2/24]
+      addresses:
+        - 10.10.3.2/24
       nameservers:
         addresses: [10.10.3.22, 8.8.8.8]
       routes:
@@ -85,12 +87,11 @@ network:
           via: 10.10.3.1
 ```
 
-Then apply it:
+Then apply the configuration:
 
 ```bash
-sudo cp netplan/01-netcfg.yaml /etc/netplan/
+sudo netplan generate
 sudo netplan apply
-sudo systemctl restart systemd-networkd
 ```
 
 ### 5. Reboot the Host
@@ -127,19 +128,45 @@ After rebooting:
 
 ## Troubleshooting
 
-- **Error: "interface br0 is not defined"**
-  - Ensure you include a placeholder `br0` under `bridges:` in Netplan as shown above.
+### Network Startup Delay
 
-- **OVS Error: "could not add network device br0 to ofproto (file exists)"**
-  - This may occur if the interface is already managed by another service or leftover from a failed configuration.
-  - Reboot the system or manually remove the bridge with:
-    ```bash
-    sudo ovs-vsctl --if-exists del-br br0
-    ```
+If the system stalls at `systemd-networkd-wait-online.service`, disable and mask it:
 
-- **`systemd-networkd-wait-online` stalls or fails**
-  - This is often caused by Netplan waiting for `br0`, which isn't fully configured yet.
-  - Use `optional: true` in the Netplan bridge definition to avoid blocking boot.
+```bash
+sudo systemctl disable systemd-networkd-wait-online.service
+sudo systemctl mask systemd-networkd-wait-online.service
+```
+
+### Interface `br0` Not Defined
+
+Ensure that `br0` is declared in the Netplan YAML. Netplan must define the bridge, even if Open vSwitch also creates it.
+
+### OVS Bridge Already Exists
+
+If `ovs-vsctl` shows: `could not add network device br0 to ofproto (file exists)`, the bridge might have been defined both by Netplan and OVS. To avoid this:
+
+- Use Netplan only to define the existence of `br0` (with no interfaces).
+- Let `setup-ovs.sh` handle the OVS configuration.
+
+### Still Delays on Boot?
+
+Create a systemd-networkd override for `br0`:
+
+```bash
+sudo mkdir -p /etc/systemd/network/
+cat <<EOF | sudo tee /etc/systemd/network/br0.network
+[Match]
+Name=br0
+
+[Network]
+DHCP=no
+
+[Link]
+RequiredForOnline=no
+EOF
+
+sudo systemctl restart systemd-networkd
+```
 
 ---
 
