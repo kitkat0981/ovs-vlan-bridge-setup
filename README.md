@@ -7,7 +7,7 @@ This repository contains scripts and configuration files to set up an Open vSwit
 - `ens4` and `ens6`: Trunk ports carrying VLANs 2201–2205
 - `ens5`: Access port on VLAN 2201, used for management (IP: `10.10.3.2/24`)
 
-The diagram:
+- The diagram:
 ![diagram](images/diagram.png)
 
 ## Files
