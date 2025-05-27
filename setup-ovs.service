@@ -1,6 +1,9 @@
+
 [Unit]
 Description=Setup OVS Bridge with VLANs
-Before=network-pre.target network.target network-online.target systemd-networkd-wait-online.service
+After=openvswitch-switch.service network-pre.target network.target
+Requires=openvswitch-switch.service
+Before=network-online.target systemd-networkd-wait-online.service
 Wants=network-pre.target
 
 [Service]
@@ -10,3 +13,5 @@ RemainAfterExit=true
 
 [Install]
 WantedBy=network.target
+
+
