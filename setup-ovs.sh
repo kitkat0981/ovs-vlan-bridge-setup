@@ -1,40 +1,43 @@
 #!/bin/bash
-set -e
 
-# Delete existing bridge if exists
-ovs-vsctl --if-exists del-br br0
+set -euo pipefail
 
-# Create the bridge
-ovs-vsctl add-br br0
+LOG_FILE="/var/log/setup-ovs.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+echo "=== Starting Open vSwitch Setup ==="
+
+# Interfaces
+BRIDGE="br0"
+TRUNK_PORTS=("ens4" "ens6")
+ACCESS_PORT="ens5"
+ACCESS_VLAN=2201
+
+# Clean up existing bridge
+echo "Deleting bridge $BRIDGE if it exists..."
+ovs-vsctl --if-exists del-br "$BRIDGE"
+
+# Create bridge
+echo "Creating bridge $BRIDGE..."
+ovs-vsctl add-br "$BRIDGE"
 
 # Add trunk ports
-ovs-vsctl add-port br0 ens4 trunks=2201-2205
-ovs-vsctl add-port br0 ens6 trunks=2201-2205
+for PORT in "${TRUNK_PORTS[@]}"; do
+    echo "Adding trunk port $PORT to $BRIDGE..."
+    ovs-vsctl add-port "$BRIDGE" "$PORT" trunks=2201-2205
+    echo "Bringing up interface $PORT..."
+    ip link set "$PORT" up
+done
 
 # Add access port
-ovs-vsctl add-port br0 ens5 tag=2201
+echo "Adding access port $ACCESS_PORT to $BRIDGE with VLAN $ACCESS_VLAN..."
+ovs-vsctl add-port "$BRIDGE" "$ACCESS_PORT" tag=$ACCESS_VLAN
+echo "Bringing up interface $ACCESS_PORT..."
+ip link set "$ACCESS_PORT" up
 
-# Bring up interfaces
-ip link set br0 up
-ip link set ens4 up
-ip link set ens5 up
-ip link set ens6 up
+# Bring up the bridge itself
+echo "Bringing up bridge interface $BRIDGE..."
+ip link set "$BRIDGE" up
 
-# Wait briefly for bridge creation
-sleep 1
-
-# Create VLAN interface on top of br0
-ip link add link br0 name br0.2201 type vlan id 2201
-
-# Assign IP address
-ip addr add 10.10.3.2/24 dev br0.2201
-
-# Bring up the VLAN interface
-ip link set br0.2201 up
-
-# Add default route
-ip route add default via 10.10.3.1
-
-# Optional DNS
-echo "nameserver 10.10.3.22" > /etc/resolv.conf
-echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+echo "=== OVS Bridge Setup Complete ==="
+ovs-vsctl show
