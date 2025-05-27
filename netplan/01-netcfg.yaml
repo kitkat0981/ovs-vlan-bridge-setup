@@ -2,19 +2,16 @@ network:
   version: 2
   renderer: networkd
 
-  bridges:
-    br0:
-      interfaces: []
-      optional: true
+#this configuration is for the OOB (Out-Of-Band) management of the host only.
 
-  vlans:
-    br0.2201:
-      id: 2201
-      link: br0
+  ethernets:
+    ens3: #change this to you out-of-band management port
+      dhcp4: false
+      dhcp6: false
       addresses:
-        - 10.10.3.2/24
-      nameservers:
-        addresses: [10.10.3.22, 8.8.8.8]
+      - 10.0.22.3/24 #change this to the IP you want to assign
       routes:
-        - to: 0.0.0.0/0
-          via: 10.10.3.1
+      - to: default
+        via: 10.0.22.254 #change this to the gateway of interface
+      nameservers:
+        addresses: [8.8.8.8] #change to whatever the DNS you want to use
