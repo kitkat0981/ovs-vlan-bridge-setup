@@ -23,7 +23,7 @@ This repository contains scripts and configuration files to set up an Open vSwit
 >
 > You **must update** these values to match your network infrastructure:
 >
-> - IP address (`10.10.3.2/24`) → your desired management IP
+> - IP address (`10.0.22.3/24`) → your desired management IP on the ens3 port (in netplan)
 > - VLANs (`2201–2205`) → your VLAN range
 > - Interfaces (`ens4`, `ens5`, `ens6`) → your actual NIC names
 
@@ -61,30 +61,20 @@ Edit `/etc/netplan/01-netcfg.yaml` to include a defined `br0` bridge:
 network:
   version: 2
   renderer: networkd
+
+#this configuration is for the OOB (Out-Of-Band) management of the host only.
+
   ethernets:
-    ens3:
+    ens3: #change this to you out-of-band management port
       dhcp4: false
-      optional: true
+      dhcp6: false
       addresses:
-        - 10.0.22.3/24
-
-  bridges:
-    br0:
-      interfaces: []
-      dhcp4: no
-      optional: true
-
-  vlans:
-    br0.2201:
-      id: 2201
-      link: br0
-      addresses:
-        - 10.10.3.2/24
-      nameservers:
-        addresses: [10.10.3.22, 8.8.8.8]
+      - 10.0.22.3/24 #change this to the IP you want to assign
       routes:
-        - to: 0.0.0.0/0
-          via: 10.10.3.1
+      - to: default
+        via: 10.0.22.254 #change this to the gateway of interface
+      nameservers:
+        addresses: [8.8.8.8] #change to whatever the DNS you want to use
 ```
 
 Then apply the configuration:
@@ -106,18 +96,18 @@ sudo reboot
 
 After rebooting:
 
-1. Check if bridge `br0` and VLAN interface `br0.2201` are up:
+1. Check if bridge `br0` is are up:
    ```bash
    ip addr show br0
-   ip addr show br0.2201
+   
    ```
 
 2. Test IP connectivity:
    ```bash
-   ping 10.10.3.1
+   ping 10.0.22.3
    ```
 
-3. Test SSH access to `10.10.3.2` from another host.
+3. Test SSH access to `10.0.22.3` from another host.
 
 4. Check Open vSwitch config:
    ```bash
